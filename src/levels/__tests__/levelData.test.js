@@ -32,10 +32,16 @@ describe('levelData', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('all test levels are score mode', () => {
+  it('includes both score and jellies modes', () => {
     const levels = getAllLevels();
-    for (const level of levels) {
-      expect(level.mode).toBe('score');
-    }
+    const modes = new Set(levels.map((l) => l.mode));
+    expect(modes.has('score')).toBe(true);
+    expect(modes.has('jellies')).toBe(true);
+  });
+
+  it('jellies level has jelly positions defined', () => {
+    const jelly = getAllLevels().find((l) => l.mode === 'jellies');
+    expect(jelly).toBeDefined();
+    expect(jelly.grid.jellies.length).toBeGreaterThan(0);
   });
 });

@@ -37,6 +37,23 @@ const levels = [
     starThresholds: [2500, 4000, 6000],
     grid: defaultGridConfig(),
   },
+  {
+    id: 4,
+    name: 'Jelly Splash',
+    mode: 'jellies',
+    fruitCount: 5,
+    moves: 30,
+    starThresholds: [1000, 2500, 4000],
+    grid: {
+      ...defaultGridConfig(),
+      jellies: [
+        [4, 4], [4, 5], [4, 6], [4, 7],
+        [5, 4], [5, 5], [5, 6], [5, 7],
+        [6, 4], [6, 5], [6, 6], [6, 7],
+        [7, 4], [7, 5], [7, 6], [7, 7],
+      ],
+    },
+  },
 ];
 
 /**

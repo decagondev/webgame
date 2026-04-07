@@ -54,6 +54,10 @@ export function validateLevel(config) {
     errors.push('Score mode requires targetScore > 0');
   }
 
+  if (config.mode === 'jellies' && (!config.grid?.jellies || config.grid.jellies.length === 0)) {
+    errors.push('Jellies mode requires at least one jelly position');
+  }
+
   if (!config.starThresholds || config.starThresholds.length !== 3) {
     errors.push('starThresholds must be an array of 3 numbers');
   } else {
