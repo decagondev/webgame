@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { GameState } from '../GameState.js';
 import { GRID_ROWS, GRID_COLS, createFullShape } from '../grid.js';
+import { SpecialType } from '../specials/SpecialTypes.js';
 
 describe('GameState', () => {
   it('initializes with a grid and score of 0', () => {
@@ -92,5 +93,55 @@ describe('GameState', () => {
     const result = await state.swap(0, 0, 0, 1);
     expect(result).toBe(false);
     state.isProcessing = false;
+  });
+
+  it('initializes specials grid with NONE', () => {
+    const state = new GameState({ fruitCount: 5 });
+    expect(state.specials.length).toBe(GRID_ROWS);
+    for (let r = 0; r < GRID_ROWS; r++) {
+      for (let c = 0; c < GRID_COLS; c++) {
+        expect(state.specials[r][c]).toBe(SpecialType.NONE);
+      }
+    }
+  });
+
+  it('getState includes specials', () => {
+    const state = new GameState({ fruitCount: 5 });
+    const s = state.getState();
+    expect(s.specials).toBe(state.specials);
+  });
+
+  it('swapSpecials swaps special markers', () => {
+    const state = new GameState({ fruitCount: 5 });
+    state.specials[0][0] = SpecialType.STRIPED_H;
+    state.specials[0][1] = SpecialType.WRAPPED;
+    state.swapSpecials(0, 0, 0, 1);
+    expect(state.specials[0][0]).toBe(SpecialType.WRAPPED);
+    expect(state.specials[0][1]).toBe(SpecialType.STRIPED_H);
+  });
+
+  it('getMatchDirection returns horizontal for same-row cells', () => {
+    const state = new GameState({ fruitCount: 5 });
+    const match = { cells: [[0, 0], [0, 1], [0, 2]], type: 'match3' };
+    expect(state.getMatchDirection(match)).toBe('horizontal');
+  });
+
+  it('getMatchDirection returns vertical for same-col cells', () => {
+    const state = new GameState({ fruitCount: 5 });
+    const match = { cells: [[0, 0], [1, 0], [2, 0]], type: 'match3' };
+    expect(state.getMatchDirection(match)).toBe('vertical');
+  });
+
+  it('getMatchDirection returns null for L/T shapes', () => {
+    const state = new GameState({ fruitCount: 5 });
+    const match = { cells: [[0, 0], [0, 1], [0, 2], [1, 2], [2, 2]], type: 'matchL' };
+    expect(state.getMatchDirection(match)).toBeNull();
+  });
+
+  it('getMatchCenter returns the middle cell of a sorted match', () => {
+    const state = new GameState({ fruitCount: 5 });
+    const match = { cells: [[0, 2], [0, 0], [0, 1]], type: 'match3' };
+    const center = state.getMatchCenter(match);
+    expect(center).toEqual([0, 1]);
   });
 });
