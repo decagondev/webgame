@@ -208,4 +208,66 @@ describe('LevelManager', () => {
       expect(lm.getState().jellyManager).toBe(lm.jellyManager);
     });
   });
+
+  describe('ingredients mode', () => {
+    function makeIngLevel(overrides = {}) {
+      return {
+        id: 20,
+        name: 'Ingredient Test',
+        mode: 'ingredients',
+        fruitCount: 5,
+        moves: 30,
+        starThresholds: [500, 1000, 2000],
+        grid: {
+          ...defaultGridConfig(),
+          ingredients: { spawnCols: [5], totalNeeded: 2 },
+        },
+        ...overrides,
+      };
+    }
+
+    it('initializes ingredientManager for ingredients mode', () => {
+      const lm = new LevelManager(makeIngLevel());
+      expect(lm.ingredientManager).not.toBeNull();
+      expect(lm.ingredientManager.getRemaining()).toBe(2);
+    });
+
+    it('does not initialize ingredientManager for score mode', () => {
+      const lm = new LevelManager(makeScoreLevel());
+      expect(lm.ingredientManager).toBeNull();
+    });
+
+    it('wins when all ingredients collected', () => {
+      const lm = new LevelManager(makeIngLevel());
+      const completeFn = vi.fn();
+      lm.on('levelComplete', completeFn);
+
+      // Simulate all collected
+      lm.ingredientManager.collected = 2;
+      lm.gameState.score = 600;
+      lm.checkObjective();
+
+      expect(completeFn).toHaveBeenCalledWith(
+        expect.objectContaining({ won: true })
+      );
+    });
+
+    it('loses when moves run out with ingredients remaining', () => {
+      const lm = new LevelManager(makeIngLevel({ moves: 1 }));
+      const completeFn = vi.fn();
+      lm.on('levelComplete', completeFn);
+
+      lm.movesRemaining = 0;
+      lm.checkObjective();
+
+      expect(completeFn).toHaveBeenCalledWith(
+        expect.objectContaining({ won: false })
+      );
+    });
+
+    it('getState includes ingredientManager', () => {
+      const lm = new LevelManager(makeIngLevel());
+      expect(lm.getState().ingredientManager).toBe(lm.ingredientManager);
+    });
+  });
 });
