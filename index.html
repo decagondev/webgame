@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Fruit Crush</title>
+  <link rel="stylesheet" href="/src/styles.css">
+</head>
+<body>
+  <div id="game-container">
+    <header id="game-header">
+      <div class="header-item" id="header-score">
+        <span class="header-label">Score</span>
+        <span class="header-value" id="score-value">0</span>
+      </div>
+      <div class="header-item" id="header-moves">
+        <span class="header-label">Moves</span>
+        <span class="header-value" id="moves-value">--</span>
+      </div>
+      <div class="header-item" id="header-objective">
+        <span class="header-label">Target</span>
+        <span class="header-value" id="objective-value">--</span>
+      </div>
+    </header>
+    <div id="canvas-wrapper">
+      <canvas id="game-canvas"></canvas>
+    </div>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
