@@ -144,4 +144,68 @@ describe('LevelManager', () => {
     lm.tick();
     expect(completeFn).toHaveBeenCalled();
   });
+
+  describe('jellies mode', () => {
+    function makeJellyLevel(overrides = {}) {
+      return {
+        id: 10,
+        name: 'Jelly Test',
+        mode: 'jellies',
+        fruitCount: 5,
+        moves: 30,
+        starThresholds: [500, 1000, 2000],
+        grid: {
+          ...defaultGridConfig(),
+          jellies: [[4, 4], [4, 5], [4, 6]],
+        },
+        ...overrides,
+      };
+    }
+
+    it('initializes jellyManager for jellies mode', () => {
+      const lm = new LevelManager(makeJellyLevel());
+      expect(lm.jellyManager).not.toBeNull();
+      expect(lm.jellyManager.getJellyCount()).toBe(3);
+    });
+
+    it('does not initialize jellyManager for score mode', () => {
+      const lm = new LevelManager(makeScoreLevel());
+      expect(lm.jellyManager).toBeNull();
+    });
+
+    it('wins when all jellies are cleared', () => {
+      const lm = new LevelManager(makeJellyLevel());
+      const completeFn = vi.fn();
+      lm.on('levelComplete', completeFn);
+
+      // Simulate clearing all jellies
+      lm.jellyManager.clearJelly(4, 4);
+      lm.jellyManager.clearJelly(4, 5);
+      lm.jellyManager.clearJelly(4, 6);
+      lm.gameState.score = 600;
+      lm.checkObjective();
+
+      expect(completeFn).toHaveBeenCalledWith(
+        expect.objectContaining({ won: true })
+      );
+    });
+
+    it('loses when moves run out with jellies remaining', () => {
+      const lm = new LevelManager(makeJellyLevel({ moves: 1 }));
+      const completeFn = vi.fn();
+      lm.on('levelComplete', completeFn);
+
+      lm.movesRemaining = 0;
+      lm.checkObjective();
+
+      expect(completeFn).toHaveBeenCalledWith(
+        expect.objectContaining({ won: false })
+      );
+    });
+
+    it('getState includes jellyManager', () => {
+      const lm = new LevelManager(makeJellyLevel());
+      expect(lm.getState().jellyManager).toBe(lm.jellyManager);
+    });
+  });
 });

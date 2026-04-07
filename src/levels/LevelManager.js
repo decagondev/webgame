@@ -1,4 +1,5 @@
 import { GameState } from '../engine/GameState.js';
+import { JellyManager } from '../engine/jellies.js';
 import { calculateStars } from './LevelConfig.js';
 
 /**
@@ -21,6 +22,26 @@ export class LevelManager {
     this.gameState = new GameState({
       fruitCount: levelConfig.fruitCount,
       shape: levelConfig.grid?.shape,
+    });
+
+    // Initialize jelly manager for jellies mode
+    this.jellyManager = null;
+    if (levelConfig.mode === 'jellies' && levelConfig.grid?.jellies?.length > 0) {
+      this.jellyManager = new JellyManager(levelConfig.grid.jellies);
+    }
+
+    // Clear jellies when matches happen
+    this.gameState.on('match', ({ clearedCells }) => {
+      if (this.jellyManager) {
+        const positions = clearedCells.map(([r, c]) => [r, c]);
+        const cleared = this.jellyManager.clearMatchedCells(positions);
+        if (cleared > 0) {
+          this.emit('jelliesCleared', {
+            count: cleared,
+            remaining: this.jellyManager.getJellyCount(),
+          });
+        }
+      }
     });
 
     // Listen for cascadeEnd to decrement moves and check objectives
@@ -70,13 +91,21 @@ export class LevelManager {
         }
         break;
 
+      case 'jellies':
+        if (this.jellyManager && this.jellyManager.isComplete()) {
+          this.win(score);
+        } else if (this.movesRemaining <= 0) {
+          this.lose(score);
+        }
+        break;
+
       case 'timed':
         // Timed mode ends when time runs out (handled externally via tick)
         // Win is determined by score vs star thresholds
         break;
 
       default:
-        // Other modes (jellies, ingredients) will be implemented in later issues
+        // Other modes (ingredients) will be implemented in later issues
         if (this.movesRemaining <= 0) {
           this.lose(score);
         }
@@ -146,6 +175,7 @@ export class LevelManager {
       mode: this.config.mode,
       targetScore: this.config.targetScore,
       levelId: this.config.id,
+      jellyManager: this.jellyManager,
     };
   }
 }
