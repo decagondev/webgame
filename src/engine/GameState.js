@@ -4,6 +4,7 @@ import { applyGravity, fillEmpty } from './gravity.js';
 import { calculateScore } from './scoring.js';
 import { SpecialType, specialFromMatch } from './specials/SpecialTypes.js';
 import { resolveSpecial, resolveCombination, getCombinationType } from './specials/SpecialResolver.js';
+import { hasValidMoves, shuffleGrid } from './shuffle.js';
 
 /**
  * Core game state manager. Coordinates grid, matching, gravity, scoring, and specials.
@@ -69,6 +70,7 @@ export class GameState {
       if (comboType) {
         this.emit('swap', { r1, c1, r2, c2 });
         await this.handleCombination(s1, s2, r1, c1, r2, c2);
+        this.checkAndShuffle();
         this.isProcessing = false;
         this.emit('cascadeEnd', { score: this.score });
         return true;
@@ -83,6 +85,7 @@ export class GameState {
       const targetR = s1 === SpecialType.COLOR_BOMB ? r2 : r1;
       const targetC = s1 === SpecialType.COLOR_BOMB ? c2 : c1;
       await this.activateColorBomb(bombR, bombC, targetR, targetC);
+      this.checkAndShuffle();
       this.isProcessing = false;
       this.emit('cascadeEnd', { score: this.score });
       return true;
@@ -103,6 +106,7 @@ export class GameState {
     }
 
     await this.processCascades(matches);
+    this.checkAndShuffle();
     this.isProcessing = false;
     this.emit('cascadeEnd', { score: this.score });
     return true;
@@ -352,5 +356,15 @@ export class GameState {
       return sorted[midIdx];
     }
     return cells[Math.floor(cells.length / 2)];
+  }
+
+  /**
+   * Check if the board has valid moves. If not, shuffle and emit event.
+   */
+  checkAndShuffle() {
+    if (!hasValidMoves(this.grid)) {
+      const success = shuffleGrid(this.grid, this.fruitCount);
+      this.emit('shuffle', { success });
+    }
   }
 }
