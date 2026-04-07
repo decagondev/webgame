@@ -1,5 +1,6 @@
 import { GameState } from '../engine/GameState.js';
 import { JellyManager } from '../engine/jellies.js';
+import { IngredientManager } from '../engine/ingredients.js';
 import { calculateStars } from './LevelConfig.js';
 
 /**
@@ -30,6 +31,14 @@ export class LevelManager {
       this.jellyManager = new JellyManager(levelConfig.grid.jellies);
     }
 
+    // Initialize ingredient manager for ingredients mode
+    this.ingredientManager = null;
+    if (levelConfig.mode === 'ingredients' && levelConfig.grid?.ingredients) {
+      this.ingredientManager = new IngredientManager(levelConfig.grid.ingredients);
+      // Spawn initial ingredient
+      this.ingredientManager.spawnIngredient();
+    }
+
     // Clear jellies when matches happen
     this.gameState.on('match', ({ clearedCells }) => {
       if (this.jellyManager) {
@@ -40,6 +49,31 @@ export class LevelManager {
             count: cleared,
             remaining: this.jellyManager.getJellyCount(),
           });
+        }
+      }
+    });
+
+    // After gravity, check ingredient collection and move ingredients
+    this.gameState.on('gravity', ({ drops }) => {
+      if (this.ingredientManager) {
+        // Move ingredients that were affected by gravity
+        for (const drop of drops) {
+          if (this.ingredientManager.hasIngredient(drop.fromRow, drop.col)) {
+            this.ingredientManager.moveIngredient(drop.fromRow, drop.col, drop.toRow, drop.col);
+          }
+        }
+        // Check if any reached the bottom
+        const collected = this.ingredientManager.checkCollection();
+        if (collected > 0) {
+          this.emit('ingredientCollected', {
+            collected,
+            remaining: this.ingredientManager.getRemaining(),
+          });
+          // Spawn next ingredient if needed
+          const spawned = this.ingredientManager.spawnIngredient();
+          if (spawned) {
+            this.emit('ingredientSpawned', spawned);
+          }
         }
       }
     });
@@ -99,13 +133,19 @@ export class LevelManager {
         }
         break;
 
+      case 'ingredients':
+        if (this.ingredientManager && this.ingredientManager.isComplete()) {
+          this.win(score);
+        } else if (this.movesRemaining <= 0) {
+          this.lose(score);
+        }
+        break;
+
       case 'timed':
         // Timed mode ends when time runs out (handled externally via tick)
-        // Win is determined by score vs star thresholds
         break;
 
       default:
-        // Other modes (ingredients) will be implemented in later issues
         if (this.movesRemaining <= 0) {
           this.lose(score);
         }
@@ -176,6 +216,7 @@ export class LevelManager {
       targetScore: this.config.targetScore,
       levelId: this.config.id,
       jellyManager: this.jellyManager,
+      ingredientManager: this.ingredientManager,
     };
   }
 }

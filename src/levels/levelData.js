@@ -54,6 +54,27 @@ const levels = [
       ],
     },
   },
+  {
+    id: 5,
+    name: 'Harvest Time',
+    mode: 'ingredients',
+    fruitCount: 5,
+    moves: 35,
+    starThresholds: [1500, 3000, 5000],
+    grid: {
+      ...defaultGridConfig(),
+      ingredients: { spawnCols: [3, 8], totalNeeded: 4 },
+    },
+  },
+  {
+    id: 6,
+    name: 'Speed Crush',
+    mode: 'timed',
+    fruitCount: 5,
+    timeLimit: 60,
+    starThresholds: [2000, 4000, 7000],
+    grid: defaultGridConfig(),
+  },
 ];
 
 /**

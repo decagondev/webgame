@@ -58,6 +58,15 @@ export function validateLevel(config) {
     errors.push('Jellies mode requires at least one jelly position');
   }
 
+  if (config.mode === 'ingredients') {
+    if (!config.grid?.ingredients?.spawnCols?.length) {
+      errors.push('Ingredients mode requires spawnCols');
+    }
+    if (!config.grid?.ingredients?.totalNeeded || config.grid.ingredients.totalNeeded < 1) {
+      errors.push('Ingredients mode requires totalNeeded > 0');
+    }
+  }
+
   if (!config.starThresholds || config.starThresholds.length !== 3) {
     errors.push('starThresholds must be an array of 3 numbers');
   } else {
