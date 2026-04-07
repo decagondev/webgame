@@ -5,18 +5,31 @@ import { GridRenderer } from './renderer/GridRenderer.js';
 import { AnimationManager } from './renderer/AnimationManager.js';
 import { InputHandler } from './ui/InputHandler.js';
 import { showPreLevel, showPostLevel, showLevelSelect } from './ui/screens.js';
+import { showMainMenu } from './ui/mainMenu.js';
+import { showSettings } from './ui/settingsScreen.js';
+import { showLeaderboard } from './ui/leaderboardScreen.js';
+import { SaveManager } from './services/save.js';
+import { audioManager } from './audio/AudioManager.js';
+import { EndlessMode } from './systems/endless.js';
+import {
+  initFirebase,
+  signInWithGoogle,
+  signOut,
+  getCurrentUser,
+  isSignedIn,
+} from './services/firebase.js';
+import { LeaderboardService } from './services/leaderboard.js';
 
 let app, gridRenderer, animationManager, inputHandler;
 let currentLevel = null;
 let timerInterval = null;
-
-// Simple progress tracking (will be replaced by SaveManager in issue #15)
-const progress = {
-  unlockedUpTo: 1,
-  stars: {},
-};
+const saveManager = new SaveManager();
+const leaderboardService = new LeaderboardService();
 
 async function init() {
+  // Initialize Firebase (no-op if not configured)
+  initFirebase();
+
   const canvas = document.getElementById('game-canvas');
   const wrapper = document.getElementById('canvas-wrapper');
 
@@ -38,21 +51,36 @@ async function init() {
     app.renderer.resize(w, h);
     gridRenderer.resize(w, h);
     if (currentLevel) {
-      gridRenderer.render(currentLevel.gameState.grid);
+      const grid = currentLevel.gameState
+        ? currentLevel.gameState.grid
+        : currentLevel.grid;
+      if (grid) gridRenderer.render(grid);
     }
   }
 
   window.addEventListener('resize', resizeCanvas);
   window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 100));
-
-  // Initial resize
   resizeCanvas();
 
-  // Show level select on start
-  showLevelSelectScreen();
+  showMainMenuScreen();
 }
 
+// ─── Main Menu ───
+
+function showMainMenuScreen() {
+  currentLevel = null;
+  showMainMenu({
+    onPlay: showLevelSelectScreen,
+    onEndless: startEndlessMode,
+    onLeaderboard: showGlobalLeaderboard,
+    onSettings: showSettingsScreen,
+  });
+}
+
+// ─── Level Select ───
+
 function showLevelSelectScreen() {
+  const progress = saveManager.getProgress();
   showLevelSelect(
     getLevelCount(),
     progress.unlockedUpTo,
@@ -64,11 +92,10 @@ function showLevelSelectScreen() {
 function startLevel(levelId) {
   const config = getLevel(levelId);
   if (!config) return;
-
-  showPreLevel(config, () => {
-    playLevel(config);
-  });
+  showPreLevel(config, () => playLevel(config));
 }
+
+// ─── Level Play ───
 
 function playLevel(config) {
   const scoreValue = document.getElementById('score-value');
@@ -79,43 +106,18 @@ function playLevel(config) {
   currentLevel = new LevelManager(config);
   const lm = currentLevel;
 
-  // Update header
   scoreValue.textContent = '0';
   movesValue.textContent = config.mode === 'timed' ? config.timeLimit : config.moves;
   objectiveValue.textContent = config.mode === 'score' ? config.targetScore.toLocaleString() : '--';
   movesLabel.textContent = config.mode === 'timed' ? 'Time' : 'Moves';
 
-  // Render grid
   const wrapper = document.getElementById('canvas-wrapper');
   app.renderer.resize(wrapper.clientWidth, wrapper.clientHeight);
   gridRenderer.resize(wrapper.clientWidth, wrapper.clientHeight);
   gridRenderer.render(lm.gameState.grid);
 
-  // Wire game state events
-  lm.gameState.on('swap', async ({ r1, c1, r2, c2 }) => {
-    await animationManager.animateSwap(r1, c1, r2, c2);
-  });
-  lm.gameState.on('rejectSwap', async ({ r1, c1, r2, c2 }) => {
-    await animationManager.animateSwap(r2, c2, r1, c1);
-  });
-  lm.gameState.on('match', ({ clearedCells, cascadeLevel }) => {
-    animationManager.animateClear(clearedCells, cascadeLevel);
-  });
-  lm.gameState.on('gravity', ({ drops }) => {
-    animationManager.animateDrops(drops);
-  });
-  lm.gameState.on('fill', () => {
-    gridRenderer.render(lm.gameState.grid);
-  });
-  lm.gameState.on('score', ({ total }) => {
-    scoreValue.textContent = total.toLocaleString();
-  });
-  lm.gameState.on('cascadeEnd', () => {
-    gridRenderer.render(lm.gameState.grid);
-    if (inputHandler) inputHandler.setEnabled(true);
-  });
+  wireGameEvents(lm.gameState, scoreValue);
 
-  // Wire level manager events
   lm.on('movesChanged', ({ movesRemaining }) => {
     movesValue.textContent = movesRemaining;
   });
@@ -125,18 +127,10 @@ function playLevel(config) {
 
   lm.on('levelComplete', (result) => {
     if (inputHandler) inputHandler.setEnabled(false);
-    if (timerInterval) {
-      clearInterval(timerInterval);
-      timerInterval = null;
-    }
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
 
-    // Update progress
     if (result.won) {
-      const bestStars = progress.stars[result.levelId] || 0;
-      progress.stars[result.levelId] = Math.max(bestStars, result.stars);
-      if (result.levelId >= progress.unlockedUpTo) {
-        progress.unlockedUpTo = Math.min(result.levelId + 1, getLevelCount());
-      }
+      saveManager.setLevelComplete(result.levelId, result.stars, result.score);
     }
 
     setTimeout(() => {
@@ -146,7 +140,7 @@ function playLevel(config) {
           if (nextId <= getLevelCount()) {
             startLevel(nextId);
           } else {
-            showLevelSelectScreen();
+            showMainMenuScreen();
           }
         } else {
           startLevel(result.levelId);
@@ -155,24 +149,144 @@ function playLevel(config) {
     }, 500);
   });
 
-  // Setup input
-  const canvas = document.getElementById('game-canvas');
-  if (inputHandler) {
-    inputHandler.setEnabled(false);
-  }
-  inputHandler = new InputHandler(canvas, gridRenderer, async (r1, c1, r2, c2) => {
+  setupInput(async (r1, c1, r2, c2) => {
     inputHandler.setEnabled(false);
     const result = await lm.swap(r1, c1, r2, c2);
-    if (!result) {
-      inputHandler.setEnabled(true);
-    }
+    if (!result) inputHandler.setEnabled(true);
   });
 
-  // Timer for timed mode
   if (timerInterval) clearInterval(timerInterval);
   if (config.mode === 'timed') {
     timerInterval = setInterval(() => lm.tick(), 1000);
   }
+}
+
+// ─── Endless Mode ───
+
+function startEndlessMode() {
+  const scoreValue = document.getElementById('score-value');
+  const movesValue = document.getElementById('moves-value');
+  const objectiveValue = document.getElementById('objective-value');
+  const movesLabel = document.querySelector('#header-moves .header-label');
+
+  const endless = new EndlessMode({ fruitCount: 6 });
+  currentLevel = endless;
+
+  scoreValue.textContent = '0';
+  movesValue.textContent = '--';
+  objectiveValue.textContent = 'Endless';
+  movesLabel.textContent = 'Moves';
+
+  const wrapper = document.getElementById('canvas-wrapper');
+  app.renderer.resize(wrapper.clientWidth, wrapper.clientHeight);
+  gridRenderer.resize(wrapper.clientWidth, wrapper.clientHeight);
+  gridRenderer.render(endless.gameState.grid);
+
+  wireGameEvents(endless.gameState, scoreValue);
+
+  endless.on('gameOver', ({ score }) => {
+    if (inputHandler) inputHandler.setEnabled(false);
+    showPostLevel(
+      { won: false, score, stars: 0, levelId: 0 },
+      () => showMainMenuScreen()
+    );
+  });
+
+  endless.on('shuffle', () => {
+    gridRenderer.render(endless.gameState.grid);
+  });
+
+  setupInput(async (r1, c1, r2, c2) => {
+    inputHandler.setEnabled(false);
+    const result = await endless.swap(r1, c1, r2, c2);
+    if (!result) inputHandler.setEnabled(true);
+  });
+}
+
+// ─── Leaderboard ───
+
+async function showGlobalLeaderboard() {
+  const entries = await leaderboardService.getGlobalLeaderboard();
+  const user = getCurrentUser();
+  showLeaderboard({
+    entries,
+    title: 'Global Leaderboard',
+    currentUid: user?.uid || null,
+    isSignedIn: isSignedIn(),
+    onClose: showMainMenuScreen,
+    onSignIn: async () => {
+      await signInWithGoogle();
+      showGlobalLeaderboard();
+    },
+  });
+}
+
+// ─── Settings ───
+
+function showSettingsScreen() {
+  const user = getCurrentUser();
+  showSettings({
+    musicVolume: audioManager.getMusicVolume(),
+    sfxVolume: audioManager.getSfxVolume(),
+    muted: audioManager.isMuted(),
+    isSignedIn: isSignedIn(),
+    userName: user?.displayName || null,
+    onMusicVolume: (vol) => audioManager.setMusicVolume(vol),
+    onSfxVolume: (vol) => audioManager.setSfxVolume(vol),
+    onToggleMute: () => audioManager.toggleMute(),
+    onSignIn: async () => {
+      await signInWithGoogle();
+      showSettingsScreen();
+    },
+    onSignOut: async () => {
+      await signOut();
+      showSettingsScreen();
+    },
+    onClose: showMainMenuScreen,
+  });
+}
+
+// ─── Shared Helpers ───
+
+function wireGameEvents(gameState, scoreValue) {
+  gameState.on('swap', async ({ r1, c1, r2, c2 }) => {
+    await animationManager.animateSwap(r1, c1, r2, c2);
+  });
+  gameState.on('rejectSwap', async ({ r1, c1, r2, c2 }) => {
+    await animationManager.animateSwap(r2, c2, r1, c1);
+  });
+  gameState.on('match', ({ clearedCells, cascadeLevel }) => {
+    animationManager.animateClear(clearedCells, cascadeLevel);
+  });
+  gameState.on('gravity', ({ drops }) => {
+    animationManager.animateDrops(drops);
+  });
+  gameState.on('fill', () => {
+    if (currentLevel) {
+      const grid = currentLevel.gameState
+        ? currentLevel.gameState.grid
+        : currentLevel.grid;
+      if (grid) gridRenderer.render(grid);
+    }
+  });
+  gameState.on('score', ({ total }) => {
+    scoreValue.textContent = total.toLocaleString();
+  });
+  gameState.on('cascadeEnd', () => {
+    if (currentLevel) {
+      const grid = currentLevel.gameState
+        ? currentLevel.gameState.grid
+        : currentLevel.grid;
+      if (grid) gridRenderer.render(grid);
+    }
+    if (inputHandler) inputHandler.setEnabled(true);
+  });
+}
+
+function setupInput(onSwap) {
+  const canvas = document.getElementById('game-canvas');
+  if (inputHandler) inputHandler.setEnabled(false);
+  inputHandler = new InputHandler(canvas, gridRenderer, onSwap);
 }
 
 init().catch(console.error);

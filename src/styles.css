@@ -256,3 +256,159 @@ html, body {
   opacity: 0.7;
   margin: 8px 0;
 }
+
+/* Main Menu */
+.main-menu-card {
+  min-width: 300px;
+}
+
+.game-title {
+  font-size: 36px;
+  color: #ffd700;
+  text-shadow: 0 2px 8px rgba(255, 215, 0, 0.4);
+  margin-bottom: 4px;
+}
+
+.game-subtitle {
+  font-size: 14px;
+  opacity: 0.6;
+  margin-bottom: 24px;
+}
+
+.menu-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.menu-btn {
+  width: 100%;
+  min-height: 48px;
+  font-size: 16px;
+}
+
+.btn-secondary {
+  background: linear-gradient(135deg, #2d1b69, #4a2d8a);
+  color: #fff;
+  border: 2px solid #ffd700;
+}
+
+.btn-small {
+  padding: 8px 20px;
+  font-size: 14px;
+}
+
+/* Settings */
+.settings-section {
+  text-align: left;
+  margin: 16px 0;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+}
+
+.settings-section h3 {
+  font-size: 13px;
+  color: #ffd700;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.settings-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+.settings-row input[type="range"] {
+  width: 120px;
+  accent-color: #ffd700;
+}
+
+.btn-toggle {
+  background: #333;
+  color: #aaa;
+  border: 1px solid #555;
+  border-radius: 4px;
+  padding: 4px 16px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.btn-toggle.active {
+  background: #ffd700;
+  color: #1a0a2e;
+  border-color: #ffd700;
+}
+
+.settings-auth {
+  text-align: center;
+}
+
+.settings-auth p {
+  font-size: 13px;
+  margin-bottom: 8px;
+  opacity: 0.8;
+}
+
+/* ─── Responsive: small phones (320px) ─── */
+@media (max-width: 380px) {
+  .header-label { font-size: 9px; letter-spacing: 0.5px; }
+  .header-value { font-size: 16px; }
+  #game-header { padding: 6px 8px; }
+
+  .screen-card { padding: 20px 16px; min-width: unset; }
+  .screen-card h2 { font-size: 20px; }
+  .game-title { font-size: 28px; }
+
+  .level-grid { grid-template-columns: repeat(5, 1fr); gap: 4px; }
+  .level-btn { min-width: 40px; min-height: 40px; padding: 6px 2px; }
+
+  .btn-primary { padding: 10px 24px; font-size: 16px; }
+
+  .stars-display { font-size: 28px; }
+
+  .lb-row { padding: 6px 8px; gap: 8px; font-size: 13px; }
+}
+
+/* ─── Responsive: tablets and up ─── */
+@media (min-width: 601px) {
+  #game-container { max-width: 600px; }
+  .header-value { font-size: 22px; }
+}
+
+/* ─── Landscape orientation ─── */
+@media (orientation: landscape) and (max-height: 500px) {
+  #game-header {
+    padding: 4px 12px;
+    flex-wrap: nowrap;
+  }
+  .header-label { font-size: 9px; }
+  .header-value { font-size: 14px; }
+
+  .screen-card { padding: 16px 12px; max-height: 95vh; }
+  .screen-card h2 { font-size: 18px; margin-bottom: 4px; }
+  .game-title { font-size: 24px; }
+  .menu-buttons { gap: 6px; }
+  .menu-btn { min-height: 40px; font-size: 14px; }
+  .stars-display { font-size: 24px; margin: 6px 0; }
+}
+
+/* ─── Ensure touch targets are minimum 44px ─── */
+button, .level-btn, .tool-btn, .btn-toggle {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* ─── Safe area insets for notched phones ─── */
+@supports (padding: env(safe-area-inset-top)) {
+  #game-header {
+    padding-top: max(8px, env(safe-area-inset-top));
+  }
+  #game-container {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
